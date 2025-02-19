@@ -218,18 +218,18 @@ const styles = StyleSheet.create({
     },
     // Styles de la carte produit pour les favoris
     favoriteItem: {
+        flex: 1,
         backgroundColor: '#1F1B24',
+        margin: 5,
         borderRadius: 10,
-        padding: 15,
-        marginRight: 15,
-        alignItems: 'center',
-        width: 150,
-        // Ajout d'une ombre pour un effet carte (Android et iOS)
-        shadowColor: "#000",
+        height: 212,
+        padding: 10,
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.3,
-        shadowRadius: 3,
-        elevation: 5,
+        shadowRadius: 4,
+        elevation: 3,
+        alignItems: 'center',
     },
     favoriteImage: {
         width: 130,
