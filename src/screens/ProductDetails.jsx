@@ -1,9 +1,15 @@
+// src/screens/ProductDetails.jsx
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, Image, ScrollView, SafeAreaView } from 'react-native';
-import { ThemedText } from '@/components/ThemedText';
+import { ThemedText } from '../components/ThemedText';
+import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
+import { useNavigation } from '@react-navigation/native';
 
-export default function ProductDetails({ route, navigation }) {
-    // ✅ Vérification des paramètres envoyés
+export default function ProductDetails({ route }) {
+    const navigation = useNavigation();
+
+    // Vérification des paramètres envoyés
     if (!route.params || !route.params.product) {
         return (
             <SafeAreaView style={styles.container}>
@@ -20,12 +26,44 @@ export default function ProductDetails({ route, navigation }) {
         console.log(`Produit ${product.name} ajouté au panier.`);
     };
 
+    const handleCartPress = () => {
+        // Ajoute ici la navigation vers l'écran du panier ou autre logique
+        navigation.navigate('Cart');
+    };
+
+    const handleProfilePress = () => {
+        navigation.navigate('Profile');
+    };
+
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#121212' }}>
             <ScrollView contentContainerStyle={styles.container}>
+                {/* Header/Menu */}
+                <View style={styles.menuHeader}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconButton}>
+                        <Ionicons name="arrow-back-outline" size={24} color="#121212" />
+                    </TouchableOpacity>
+                    <ThemedText type="title" style={styles.siteTitle}>
+                        TroDraule.fr
+                    </ThemedText>
+                    <View style={styles.rightIcons}>
+                        <TouchableOpacity onPress={handleCartPress} style={styles.iconButton}>
+                            <Ionicons name="cart-outline" size={24} color="#121212" />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={handleProfilePress} style={styles.iconButton}>
+                            <Ionicons name="person-outline" size={24} color="#121212" />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* Carte de détails du produit */}
                 <View style={styles.card}>
                     {product.imageUrl ? (
-                        <Image style={styles.image} source={{ uri: product.imageUrl }} resizeMode="cover" />
+                        <Image
+                            style={styles.image}
+                            source={{ uri: product.imageUrl }}
+                            resizeMode="contain"
+                        />
                     ) : (
                         <View style={[styles.image, styles.noImage]}>
                             <ThemedText style={styles.noImageText}>Pas d'image</ThemedText>
@@ -57,6 +95,27 @@ const styles = StyleSheet.create({
         padding: 20,
         backgroundColor: '#121212',
         flexGrow: 1,
+        paddingTop: Constants.statusBarHeight + 10, // Espace pour la barre d'état
+    },
+    menuHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 20,
+    },
+    siteTitle: {
+        fontSize: 28,
+        fontWeight: 'bold',
+        color: '#BB86FC',
+    },
+    iconButton: {
+        padding: 8,
+        backgroundColor: '#03dac6',
+        borderRadius: 20,
+        marginRight: 5,
+    },
+    rightIcons: {
+        flexDirection: 'row',
     },
     card: {
         backgroundColor: '#1F1B24',

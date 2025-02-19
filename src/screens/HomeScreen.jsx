@@ -1,4 +1,4 @@
-// index.jsx
+// src/screens/HomeScreen.jsx
 import React, { useState, useEffect } from 'react';
 import {
     View,
@@ -9,18 +9,28 @@ import {
     FlatList,
     Image,
 } from 'react-native';
+import Constants from 'expo-constants';
 import { ThemedText } from '../components/ThemedText';
-import { HelloWave } from '../components/HelloWave';
 import { firestore } from '../firebaseConfig';
-
 import { collection, onSnapshot } from 'firebase/firestore';
 import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function HomeScreen() {
     const navigation = useNavigation();
     const [products, setProducts] = useState([]);
     const [searchText, setSearchText] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
+
+    // Fonction de mélange (shuffle) utilisant l'algorithme Fisher-Yates
+    const shuffleArray = (array) => {
+        const newArray = [...array];
+        for (let i = newArray.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+        }
+        return newArray;
+    };
 
     useEffect(() => {
         const colRef = collection(firestore, 'products');
@@ -31,7 +41,8 @@ export default function HomeScreen() {
                     id: doc.id,
                     ...doc.data(),
                 }));
-                setProducts(fetchedProducts);
+                // Mélanger l'ordre des produits avant de les stocker
+                setProducts(shuffleArray(fetchedProducts));
             },
             (error) => {
                 console.error('Erreur lors de la récupération des produits:', error);
@@ -50,22 +61,19 @@ export default function HomeScreen() {
         navigation.navigate('Profile');
     };
 
+    const handleCartPress = () => {
+        navigation.navigate('Cart');
+    };
+
     const handleProductPress = (product) => {
         console.log("Navigating to ProductDetails with:", product);
         navigation.navigate('ProductDetails', { product });
     };
 
     const renderProduct = ({ item }) => (
-        <TouchableOpacity
-            onPress={() => handleProductPress(item)}
-            style={styles.productCard}
-        >
+        <TouchableOpacity onPress={() => handleProductPress(item)} style={styles.productCard}>
             {item.imageUrl ? (
-                <Image
-                    style={styles.productImage}
-                    source={{ uri: item.imageUrl }}
-                    resizeMode="cover"
-                />
+                <Image style={styles.productImage} source={{ uri: item.imageUrl }} resizeMode="cover" />
             ) : (
                 <View style={[styles.productImage, styles.noImage]}>
                     <ThemedText style={styles.noImageText}>Pas d'image</ThemedText>
@@ -76,9 +84,7 @@ export default function HomeScreen() {
                 <ThemedText style={styles.productPrice}>{item.price} €</ThemedText>
             )}
             {item.category && (
-                <ThemedText style={styles.productCategory}>
-                    ({item.category})
-                </ThemedText>
+                <ThemedText style={styles.productCategory}>({item.category})</ThemedText>
             )}
         </TouchableOpacity>
     );
@@ -86,16 +92,18 @@ export default function HomeScreen() {
     return (
         <SafeAreaView style={{ flex: 1 }}>
             <View style={styles.container}>
-                {/* En-tête avec Welcome et bouton Profil */}
-                <View style={styles.header}>
-                    <ThemedText type="title" style={styles.title}>
-                        Welcome!
+                {/* Menu en-tête */}
+                <View style={styles.menuHeader}>
+                    <TouchableOpacity onPress={handleCartPress} style={styles.iconButton}>
+                        <Ionicons name="cart-outline" size={24} color="#121212" />
+                    </TouchableOpacity>
+                    <ThemedText type="title" style={styles.siteTitle}>
+                        TroDraule.fr
                     </ThemedText>
-                    <TouchableOpacity onPress={handleProfilePress} style={styles.profileButton}>
-                        <ThemedText style={styles.profileButtonText}>Profil</ThemedText>
+                    <TouchableOpacity onPress={handleProfilePress} style={styles.iconButton}>
+                        <Ionicons name="person-outline" size={24} color="#121212" />
                     </TouchableOpacity>
                 </View>
-                <HelloWave />
 
                 {/* Barre de recherche */}
                 <View style={styles.searchContainer}>
@@ -131,7 +139,7 @@ export default function HomeScreen() {
                     ))}
                 </View>
 
-                {/* Grille des produits filtrés avec padding en bas */}
+                {/* Grille des produits filtrés */}
                 <FlatList
                     data={filteredProducts}
                     keyExtractor={(item) => item.id}
@@ -148,29 +156,24 @@ const styles = StyleSheet.create({
     container: {
         flexGrow: 1,
         padding: 20,
+        paddingTop: Constants.statusBarHeight + 10,
         backgroundColor: '#121212',
     },
-    header: {
+    menuHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         marginBottom: 20,
     },
-    title: {
+    siteTitle: {
         fontSize: 28,
         fontWeight: 'bold',
         color: '#BB86FC',
     },
-    profileButton: {
+    iconButton: {
+        padding: 8,
         backgroundColor: '#03dac6',
-        paddingVertical: 8,
-        paddingHorizontal: 16,
         borderRadius: 20,
-    },
-    profileButtonText: {
-        color: '#121212',
-        fontWeight: 'bold',
-        fontSize: 16,
     },
     searchContainer: {
         marginBottom: 20,
