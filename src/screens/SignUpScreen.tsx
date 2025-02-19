@@ -1,5 +1,13 @@
 import React, { useState } from "react";
-import { View, TextInput, Button, StyleSheet } from "react-native";
+import {
+    View,
+    StyleSheet,
+    TouchableOpacity,
+    TextInput,
+    SafeAreaView,
+    FlatList,
+    Image,
+} from 'react-native';
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { setDoc, doc } from "firebase/firestore";
 import { auth, firestore } from "../../firebaseConfig";
@@ -61,6 +69,7 @@ export default function SignUpScreen() {
             <TextInput
                 style={styles.input}
                 placeholder="Nom"
+                placeholderTextColor="#888"
                 value={nom}
                 onChangeText={setNom}
             />
@@ -68,6 +77,7 @@ export default function SignUpScreen() {
             <TextInput
                 style={styles.input}
                 placeholder="Prénom"
+                placeholderTextColor="#888"
                 value={prenom}
                 onChangeText={setPrenom}
             />
@@ -75,6 +85,7 @@ export default function SignUpScreen() {
             <TextInput
                 style={styles.input}
                 placeholder="Email"
+                placeholderTextColor="#888"
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -83,19 +94,82 @@ export default function SignUpScreen() {
             <TextInput
                 style={styles.input}
                 placeholder="Mot de passe"
+                placeholderTextColor="#888"
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
             />
 
-            <Button title="S'inscrire" onPress={handleSignUp} />
+            <View style={styles.buttonContainer}>
+                <TouchableOpacity style={styles.button} onPress={handleSignUp}>
+                    <ThemedText style={styles.buttonText}>S'inscrire</ThemedText>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={[styles.button, styles.secondaryButton]}
+                    onPress={() => navigation.navigate("Login")}
+                >
+                    <ThemedText style={[styles.buttonText, styles.secondaryButtonText]}>
+                        Retour à la connexion
+                    </ThemedText>
+                </TouchableOpacity>
+            </View>
         </View>
     );
+
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, justifyContent: "center", padding: 20 },
-    title: { fontSize: 24, fontWeight: "bold", marginBottom: 20 },
-    input: { borderBottomWidth: 1, marginBottom: 20, padding: 8 },
-    error: { color: "red", marginBottom: 10 },
+    container: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        padding: 20,
+        backgroundColor: "#121212",
+    },
+    title: {
+        fontSize: 28,
+        fontWeight: "bold",
+        color: "#BB86FC",
+        marginBottom: 20,
+    },
+    input: {
+        width: "100%",
+        backgroundColor: "#1F1B24",
+        color: "#E1E1E1",
+        padding: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: "#888",
+        marginBottom: 15,
+    },
+    error: {
+        color: "#CF6679",
+        fontSize: 14,
+        marginBottom: 10,
+    },
+    buttonContainer: {
+        width: "100%",
+        marginTop: 10,
+    },
+    button: {
+        backgroundColor: "#03dac6",
+        paddingVertical: 12,
+        borderRadius: 8,
+        alignItems: "center",
+        marginBottom: 10,
+    },
+    buttonText: {
+        color: "#121212",
+        fontWeight: "bold",
+        fontSize: 16,
+    },
+    secondaryButton: {
+        backgroundColor: "transparent",
+        borderWidth: 1,
+        borderColor: "#03dac6",
+    },
+    secondaryButtonText: {
+        color: "#03dac6",
+    },
 });
