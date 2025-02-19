@@ -6,27 +6,48 @@ import {
     TouchableOpacity,
     StyleSheet,
     FlatList,
-    Image,
+    Image
 } from 'react-native';
 import Constants from 'expo-constants';
 import { ThemedText } from '../components/ThemedText';
 import { firestore } from '../../firebaseConfig';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, doc } from 'firebase/firestore';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function ProfileScreen() {
     const navigation = useNavigation();
+    const { user, logout } = useAuth();
+    const [userData, setUserData] = useState(null);
+    const [favoriteProducts, setFavoriteProducts] = useState([]);
 
-    // Exemple d'infos utilisateur (à relier ultérieurement)
-    const userInfo = {
-        name: 'John Doe',
-        email: 'john.doe@example.com',
-    };
-
-    const [products, setProducts] = useState([]);
-
+    // Charger les informations de l'utilisateur
     useEffect(() => {
+        if (!user) return;
+        const userRef = doc(firestore, 'users', user.uid);
+        const unsubscribe = onSnapshot(
+            userRef,
+            (docSnap) => {
+                if (docSnap.exists()) {
+                    setUserData(docSnap.data());
+                } else {
+                    console.log("Aucune donnée trouvée pour cet utilisateur.");
+                }
+            },
+            (error) => {
+                console.error("Erreur lors de la récupération des données utilisateur:", error);
+            }
+        );
+        return () => unsubscribe();
+    }, [user]);
+
+    // Charger tous les produits et filtrer ceux dont l'ID est dans userData.favorites
+    useEffect(() => {
+        if (!userData) {
+            setFavoriteProducts([]);
+            return;
+        }
         const colRef = collection(firestore, 'products');
         const unsubscribe = onSnapshot(
             colRef,
@@ -35,28 +56,46 @@ export default function ProfileScreen() {
                     id: doc.id,
                     ...doc.data(),
                 }));
-                setProducts(fetchedProducts);
+                const userFavorites = userData.favorites || [];
+                const favorites = fetchedProducts.filter((product) =>
+                    userFavorites.includes(product.id)
+                );
+                setFavoriteProducts(favorites);
             },
             (error) => {
                 console.error('Erreur lors de la récupération des produits:', error);
             }
         );
         return () => unsubscribe();
-    }, []);
+    }, [userData]);
 
-    // Filtrer les produits favoris (on suppose que le champ "favorite" existe)
-    const favoriteProducts = products.filter((product) => product.favorite);
-
-    const handleCartPress = () => {
-        navigation.navigate('Cart');
+    const handleLogout = async () => {
+        try {
+            await logout();
+            navigation.navigate('Login');
+        } catch (error) {
+            console.error("Erreur lors de la déconnexion :", error);
+        }
     };
 
     const handleBackPress = () => {
         navigation.goBack();
     };
 
+    const handleCartPress = () => {
+        navigation.navigate('Cart');
+    };
+
+    // Lorsqu'on clique sur une carte produit, naviguer vers ProductDetails avec le produit
+    const handleFavoritePress = (product) => {
+        navigation.navigate('ProductDetails', { product });
+    };
+
     const renderFavoriteItem = ({ item }) => (
-        <View style={styles.favoriteItem}>
+        <TouchableOpacity
+            style={styles.favoriteItem}
+            onPress={() => handleFavoritePress(item)}
+        >
             {item.imageUrl ? (
                 <Image
                     style={styles.favoriteImage}
@@ -72,12 +111,12 @@ export default function ProfileScreen() {
             {item.price !== undefined && (
                 <ThemedText style={styles.favoritePrice}>{item.price} €</ThemedText>
             )}
-        </View>
+        </TouchableOpacity>
     );
 
     return (
         <SafeAreaView style={styles.container}>
-            {/* Header/Menu */}
+            {/* Header personnalisé */}
             <View style={styles.menuHeader}>
                 <TouchableOpacity onPress={handleBackPress} style={styles.iconButton}>
                     <Ionicons name="arrow-back-outline" size={24} color="#121212" />
@@ -90,13 +129,22 @@ export default function ProfileScreen() {
                 </TouchableOpacity>
             </View>
 
-            {/* Contenu du profil */}
             <View style={styles.profileContent}>
                 <ThemedText style={styles.title}>Profil</ThemedText>
-                <View style={styles.infoContainer}>
-                    <ThemedText style={styles.infoText}>Nom : {userInfo.name}</ThemedText>
-                    <ThemedText style={styles.infoText}>Email : {userInfo.email}</ThemedText>
-                </View>
+                {userData && (
+                    <View style={styles.infoContainer}>
+                        <ThemedText style={styles.infoText}>
+                            Nom : {userData.nom || 'Non défini'}
+                        </ThemedText>
+                        <ThemedText style={styles.infoText}>
+                            Prénom : {userData.prenom || 'Non défini'}
+                        </ThemedText>
+                        <ThemedText style={styles.infoText}>
+                            Email : {userData.email || user?.email || 'Non défini'}
+                        </ThemedText>
+                    </View>
+                )}
+
                 <ThemedText style={styles.sectionTitle}>Produits favoris</ThemedText>
                 <FlatList
                     data={favoriteProducts}
@@ -106,6 +154,11 @@ export default function ProfileScreen() {
                     contentContainerStyle={styles.favoritesList}
                     renderItem={renderFavoriteItem}
                 />
+
+                {/* Bouton pour se déconnecter */}
+                <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+                    <ThemedText style={styles.logoutButtonText}>Se déconnecter</ThemedText>
+                </TouchableOpacity>
             </View>
         </SafeAreaView>
     );
@@ -115,7 +168,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#121212',
-        paddingTop: Constants.statusBarHeight + 10, // Espace pour la barre d'état
+        paddingTop: Constants.statusBarHeight + 10,
     },
     menuHeader: {
         flexDirection: 'row',
@@ -163,17 +216,24 @@ const styles = StyleSheet.create({
     favoritesList: {
         paddingVertical: 10,
     },
+    // Styles de la carte produit pour les favoris
     favoriteItem: {
         backgroundColor: '#1F1B24',
         borderRadius: 10,
-        padding: 10,
-        marginRight: 10,
+        padding: 15,
+        marginRight: 15,
         alignItems: 'center',
-        width: 140,
+        width: 150,
+        // Ajout d'une ombre pour un effet carte (Android et iOS)
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 3,
+        elevation: 5,
     },
     favoriteImage: {
-        width: 120,
-        height: 120,
+        width: 130,
+        height: 130,
         borderRadius: 8,
         marginBottom: 10,
     },
@@ -196,14 +256,14 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#BB86FC',
     },
-    button: {
+    logoutButton: {
         backgroundColor: '#03dac6',
         paddingVertical: 10,
         paddingHorizontal: 20,
         borderRadius: 8,
         marginTop: 30,
     },
-    buttonText: {
+    logoutButtonText: {
         fontSize: 16,
         color: '#121212',
         fontWeight: 'bold',

@@ -1,15 +1,26 @@
 // src/screens/ProductDetails.jsx
-import React from 'react';
-import { View, StyleSheet, TouchableOpacity, Image, ScrollView, SafeAreaView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+    View,
+    StyleSheet,
+    TouchableOpacity,
+    Image,
+    ScrollView,
+    SafeAreaView,
+} from 'react-native';
 import { ThemedText } from '../components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useNavigation } from '@react-navigation/native';
+import { doc, updateDoc, arrayUnion, arrayRemove, onSnapshot } from 'firebase/firestore';
+import { firestore } from '../../firebaseConfig';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function ProductDetails({ route }) {
     const navigation = useNavigation();
+    const { user } = useAuth();
+    const [isFavorite, setIsFavorite] = useState(false);
 
-    // Vérification des paramètres envoyés
     if (!route.params || !route.params.product) {
         return (
             <SafeAreaView style={styles.container}>
@@ -18,16 +29,60 @@ export default function ProductDetails({ route }) {
         );
     }
 
-    // Récupération des détails du produit depuis la navigation
     const { product } = route.params;
 
-    // Fonction pour ajouter au panier (logique à implémenter)
+    // Vérifier dans Firestore si le produit est dans les favoris de l'utilisateur
+    useEffect(() => {
+        if (user) {
+            const userRef = doc(firestore, 'users', user.uid);
+            const unsubscribe = onSnapshot(
+                userRef,
+                (docSnap) => {
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        const favorites = data.favorites || [];
+                        setIsFavorite(favorites.includes(product.id));
+                    }
+                },
+                (error) => {
+                    console.error("Erreur lors de la récupération des favoris :", error);
+                }
+            );
+            return () => unsubscribe();
+        }
+    }, [user, product.id]);
+
+    // Fonction pour ajouter ou retirer le produit des favoris
+    const handleToggleFavorite = async () => {
+        if (!user) {
+            console.log("Utilisateur non connecté.");
+            return;
+        }
+        const userRef = doc(firestore, 'users', user.uid);
+        try {
+            if (isFavorite) {
+                await updateDoc(userRef, {
+                    favorites: arrayRemove(product.id),
+                });
+                setIsFavorite(false);
+                console.log(`Produit ${product.name} retiré des favoris.`);
+            } else {
+                await updateDoc(userRef, {
+                    favorites: arrayUnion(product.id),
+                });
+                setIsFavorite(true);
+                console.log(`Produit ${product.name} ajouté aux favoris.`);
+            }
+        } catch (error) {
+            console.error("Erreur lors de la mise à jour des favoris :", error);
+        }
+    };
+
     const handleAddToCart = () => {
         console.log(`Produit ${product.name} ajouté au panier.`);
     };
 
     const handleCartPress = () => {
-        // Ajoute ici la navigation vers l'écran du panier ou autre logique
         navigation.navigate('Cart');
     };
 
@@ -58,17 +113,29 @@ export default function ProductDetails({ route }) {
 
                 {/* Carte de détails du produit */}
                 <View style={styles.card}>
-                    {product.imageUrl ? (
-                        <Image
-                            style={styles.image}
-                            source={{ uri: product.imageUrl }}
-                            resizeMode="contain"
-                        />
-                    ) : (
-                        <View style={[styles.image, styles.noImage]}>
-                            <ThemedText style={styles.noImageText}>Pas d'image</ThemedText>
-                        </View>
-                    )}
+                    {/* Zone de l'image avec icône de favori intégrée dans la carte */}
+                    <View style={styles.imageContainer}>
+                        {product.imageUrl ? (
+                            <Image
+                                style={styles.image}
+                                source={{ uri: product.imageUrl }}
+                                resizeMode="contain"
+                            />
+                        ) : (
+                            <View style={[styles.image, styles.noImage]}>
+                                <ThemedText style={styles.noImageText}>Pas d'image</ThemedText>
+                            </View>
+                        )}
+                        <TouchableOpacity style={styles.favoriteIcon} onPress={handleToggleFavorite}>
+                            <Ionicons
+                                name={isFavorite ? 'heart' : 'heart-outline'}
+                                size={35}
+                                color={isFavorite ? 'red' : 'white'}
+                            />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Détails textuels */}
                     <ThemedText style={styles.name}>{product.name}</ThemedText>
                     {product.price !== undefined && (
                         <ThemedText style={styles.price}>{product.price} €</ThemedText>
@@ -95,13 +162,13 @@ const styles = StyleSheet.create({
         padding: 20,
         backgroundColor: '#121212',
         flexGrow: 1,
-        paddingTop: Constants.statusBarHeight + 10, // Espace pour la barre d'état
+        paddingTop: Constants.statusBarHeight + 10,
     },
     menuHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 20,
+        marginBottom: 10,
     },
     siteTitle: {
         fontSize: 28,
@@ -128,11 +195,16 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 3,
     },
-    image: {
+    imageContainer: {
+        position: 'relative',
         width: '100%',
         height: 200,
-        borderRadius: 8,
         marginBottom: 20,
+    },
+    image: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 8,
     },
     noImage: {
         backgroundColor: '#333',
@@ -142,6 +214,14 @@ const styles = StyleSheet.create({
     noImageText: {
         color: '#bbb',
         fontSize: 14,
+    },
+    favoriteIcon: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        padding: 4,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        borderRadius: 20,
     },
     name: {
         fontSize: 24,
