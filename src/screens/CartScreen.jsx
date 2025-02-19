@@ -14,28 +14,46 @@ import {
 import Constants from 'expo-constants';
 import { ThemedText } from '../components/ThemedText';
 import { firestore } from '../../firebaseConfig';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, arrayRemove, setDoc } from 'firebase/firestore';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function CartScreen() {
     const navigation = useNavigation();
-    const [products, setProducts] = useState([]);
+    const { user } = useAuth();
+    const [cartProducts, setCartProducts] = useState([]);
+    const [userData, setUserData] = useState(null);
     const [showPaymentForm, setShowPaymentForm] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [paymentConfirmed, setPaymentConfirmed] = useState(false);
 
-    // Fonction de mélange (shuffle) - algorithme Fisher-Yates
-    const shuffleArray = (array) => {
-        const newArray = [...array];
-        for (let i = newArray.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
-        }
-        return newArray;
-    };
-
+    // Charger les informations de l'utilisateur pour récupérer le panier
     useEffect(() => {
+        if (!user) return;
+        const userRef = doc(firestore, 'users', user.uid);
+        const unsubscribe = onSnapshot(
+            userRef,
+            (docSnap) => {
+                if (docSnap.exists()) {
+                    setUserData(docSnap.data());
+                } else {
+                    console.log("Aucune donnée trouvée pour cet utilisateur.");
+                }
+            },
+            (error) => {
+                console.error("Erreur lors de la récupération des données utilisateur:", error);
+            }
+        );
+        return () => unsubscribe();
+    }, [user]);
+
+    // Charger tous les produits et filtrer ceux dont l'ID figure dans le champ cart de l'utilisateur
+    useEffect(() => {
+        if (!userData || !userData.cart) {
+            setCartProducts([]);
+            return;
+        }
         const colRef = collection(firestore, 'products');
         const unsubscribe = onSnapshot(
             colRef,
@@ -44,27 +62,47 @@ export default function CartScreen() {
                     id: doc.id,
                     ...doc.data(),
                 }));
-                // Mélanger et sélectionner 5 produits
-                const shuffled = shuffleArray(fetchedProducts);
-                const selected = shuffled.slice(0, 5);
-                setProducts(selected);
+                // On ne garde que les produits dont l'ID est présent dans userData.cart
+                const productsInCart = fetchedProducts.filter((product) =>
+                    userData.cart.includes(product.id)
+                );
+                setCartProducts(productsInCart);
             },
             (error) => {
                 console.error('Erreur lors de la récupération des produits:', error);
             }
         );
         return () => unsubscribe();
-    }, []);
+    }, [userData]);
 
-    // Calcul du total de la commande
-    const total = products.reduce((sum, product) => sum + (product.price || 0), 0);
+    // Calcul du total
+    const total = cartProducts.reduce((sum, product) => sum + (product.price || 0), 0);
 
-    const handleRemoveItem = (id) => {
-        setProducts((prevProducts) => prevProducts.filter((product) => product.id !== id));
+    // Supprimer un produit du panier dans Firebase
+    const handleRemoveItem = async (id) => {
+        if (!user) return;
+        try {
+            const userRef = doc(firestore, 'users', user.uid);
+            await updateDoc(userRef, {
+                cart: arrayRemove(id),
+            });
+            // La mise à jour se fera automatiquement via l'onSnapshot sur le document utilisateur
+            console.log(`Produit ${id} retiré du panier.`);
+        } catch (error) {
+            console.error("Erreur lors de la suppression de l'article :", error);
+        }
+    };
+
+    // Lorsqu'on clique sur un article, naviguer vers la page des détails du produit
+    const handleProductPress = (product) => {
+        navigation.navigate('ProductDetails', { product });
     };
 
     const renderCartItem = ({ item }) => (
-        <View style={styles.cartItem}>
+        <TouchableOpacity
+            style={styles.cartItem}
+            onPress={() => handleProductPress(item)}
+        >
             {item.imageUrl ? (
                 <Image
                     style={styles.cartItemImage}
@@ -85,28 +123,33 @@ export default function CartScreen() {
             <TouchableOpacity onPress={() => handleRemoveItem(item.id)} style={styles.removeButton}>
                 <Ionicons name="trash-outline" size={20} color="#BB86FC" />
             </TouchableOpacity>
-        </View>
+        </TouchableOpacity>
     );
 
-    const handleOrder = () => {
-        // Ouvrir le faux formulaire de paiement
-        setShowPaymentForm(true);
-    };
-
-    const handlePayment = () => {
-        // Simuler le traitement du paiement
+    // Simuler le paiement et vider le panier (mise à jour du champ cart dans Firestore)
+    const handlePayment = async () => {
         setIsProcessing(true);
-        setTimeout(() => {
+        setTimeout(async () => {
             setIsProcessing(false);
             setPaymentConfirmed(true);
-            // Vider le panier après paiement confirmé
-            setProducts([]);
+            try {
+                const userRef = doc(firestore, 'users', user.uid);
+                // Vider le panier
+                await updateDoc(userRef, { cart: [] });
+                console.log("Panier vidé après paiement.");
+            } catch (error) {
+                console.error("Erreur lors du vidage du panier :", error);
+            }
             // Fermer le formulaire après 2 secondes
             setTimeout(() => {
                 setShowPaymentForm(false);
                 setPaymentConfirmed(false);
             }, 2000);
         }, 2000);
+    };
+
+    const handleOrder = () => {
+        setShowPaymentForm(true);
     };
 
     const handleBackPress = () => {
@@ -123,20 +166,22 @@ export default function CartScreen() {
                 <ThemedText type="title" style={styles.siteTitle}>
                     Mon Panier
                 </ThemedText>
-                {/* Bouton panier masqué pour équilibrer la mise en page */}
+                {/* Bouton panier masqué pour équilibrer le layout */}
                 <View style={{ width: 40 }} />
             </View>
 
             {/* Contenu du panier */}
             <View style={styles.cartContent}>
                 <FlatList
-                    data={products}
+                    data={cartProducts}
                     keyExtractor={(item) => item.id}
                     renderItem={renderCartItem}
                     contentContainerStyle={styles.cartList}
                 />
                 <View style={styles.totalContainer}>
-                    <ThemedText style={styles.totalText}>Total : {total.toFixed(2)} €</ThemedText>
+                    <ThemedText style={styles.totalText}>
+                        Total : {total.toFixed(2)} €
+                    </ThemedText>
                 </View>
                 <TouchableOpacity style={styles.orderButton} onPress={handleOrder}>
                     <ThemedText style={styles.orderButtonText}>Commander</ThemedText>
@@ -156,7 +201,9 @@ export default function CartScreen() {
                             <View style={styles.paymentForm}>
                                 {!isProcessing && !paymentConfirmed && (
                                     <>
-                                        <ThemedText style={styles.paymentTitle}>Nouveau, payer par la pensée !</ThemedText>
+                                        <ThemedText style={styles.paymentTitle}>
+                                            Paiement par la pensée !
+                                        </ThemedText>
                                         <TouchableOpacity style={styles.paymentButton} onPress={handlePayment}>
                                             <ThemedText style={styles.paymentButtonText}>Payer</ThemedText>
                                         </TouchableOpacity>
