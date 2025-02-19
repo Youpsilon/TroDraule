@@ -14,7 +14,15 @@ import {
 import Constants from 'expo-constants';
 import { ThemedText } from '../components/ThemedText';
 import { firestore } from '../../firebaseConfig';
-import { collection, onSnapshot, doc, updateDoc, arrayRemove, setDoc } from 'firebase/firestore';
+import {
+    collection,
+    onSnapshot,
+    doc,
+    updateDoc,
+    arrayRemove,
+    addDoc,
+    serverTimestamp,
+} from 'firebase/firestore';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
@@ -86,7 +94,6 @@ export default function CartScreen() {
             await updateDoc(userRef, {
                 cart: arrayRemove(id),
             });
-            // La mise à jour se fera automatiquement via l'onSnapshot sur le document utilisateur
             console.log(`Produit ${id} retiré du panier.`);
         } catch (error) {
             console.error("Erreur lors de la suppression de l'article :", error);
@@ -126,12 +133,30 @@ export default function CartScreen() {
         </TouchableOpacity>
     );
 
-    // Simuler le paiement et vider le panier (mise à jour du champ cart dans Firestore)
+    // Fonction pour créer une commande dans Firestore
+    const createOrder = async () => {
+        try {
+            const orderData = {
+                userId: user.uid,
+                products: userData.cart, // on stocke uniquement les IDs
+                total,
+                status: 'en cours',
+                createdAt: serverTimestamp(),
+            };
+            await addDoc(collection(firestore, 'orders'), orderData);
+            console.log("Commande créée.");
+        } catch (error) {
+            console.error("Erreur lors de la création de la commande :", error);
+        }
+    };
+
+    // Simuler le paiement, créer la commande et vider le panier
     const handlePayment = async () => {
         setIsProcessing(true);
         setTimeout(async () => {
             setIsProcessing(false);
             setPaymentConfirmed(true);
+            await createOrder();
             try {
                 const userRef = doc(firestore, 'users', user.uid);
                 // Vider le panier
@@ -166,7 +191,6 @@ export default function CartScreen() {
                 <ThemedText type="title" style={styles.siteTitle}>
                     Mon Panier
                 </ThemedText>
-                {/* Bouton panier masqué pour équilibrer le layout */}
                 <View style={{ width: 40 }} />
             </View>
 

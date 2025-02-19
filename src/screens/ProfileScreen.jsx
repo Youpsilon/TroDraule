@@ -6,12 +6,18 @@ import {
     TouchableOpacity,
     StyleSheet,
     FlatList,
-    Image
+    Image,
 } from 'react-native';
 import Constants from 'expo-constants';
 import { ThemedText } from '../components/ThemedText';
 import { firestore } from '../../firebaseConfig';
-import { collection, onSnapshot, doc } from 'firebase/firestore';
+import {
+    collection,
+    onSnapshot,
+    doc,
+    query,
+    where,
+} from 'firebase/firestore';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
@@ -21,6 +27,7 @@ export default function ProfileScreen() {
     const { user, logout } = useAuth();
     const [userData, setUserData] = useState(null);
     const [favoriteProducts, setFavoriteProducts] = useState([]);
+    const [orders, setOrders] = useState([]);
 
     // Charger les informations de l'utilisateur
     useEffect(() => {
@@ -42,7 +49,7 @@ export default function ProfileScreen() {
         return () => unsubscribe();
     }, [user]);
 
-    // Charger tous les produits et filtrer ceux dont l'ID est dans userData.favorites
+    // Charger les produits favoris (basé sur userData.favorites, qui est un tableau d'IDs)
     useEffect(() => {
         if (!userData) {
             setFavoriteProducts([]);
@@ -68,6 +75,27 @@ export default function ProfileScreen() {
         );
         return () => unsubscribe();
     }, [userData]);
+
+    // Charger les commandes de l'utilisateur depuis la collection "orders"
+    useEffect(() => {
+        if (!user) return;
+        const ordersRef = collection(firestore, 'orders');
+        const q = query(ordersRef, where('userId', '==', user.uid));
+        const unsubscribe = onSnapshot(
+            q,
+            (snapshot) => {
+                const fetchedOrders = snapshot.docs.map((doc) => ({
+                    id: doc.id,
+                    ...doc.data(),
+                }));
+                setOrders(fetchedOrders);
+            },
+            (error) => {
+                console.error("Erreur lors de la récupération des commandes :", error);
+            }
+        );
+        return () => unsubscribe();
+    }, [user]);
 
     const handleLogout = async () => {
         try {
@@ -114,6 +142,22 @@ export default function ProfileScreen() {
         </TouchableOpacity>
     );
 
+    // Rendu d'une commande dans l'historique
+    const renderOrderItem = ({ item }) => {
+        // Formater la date (si createdAt est un Timestamp Firestore)
+        const date = item.createdAt?.toDate
+            ? item.createdAt.toDate().toLocaleDateString()
+            : "Date inconnue";
+        return (
+            <View style={styles.orderItem}>
+                <ThemedText style={styles.orderText}>Commande n°: {item.id}</ThemedText>
+                <ThemedText style={styles.orderText}>Total: {item.total?.toFixed(2)} €</ThemedText>
+                <ThemedText style={styles.orderText}>Statut: {item.status}</ThemedText>
+                <ThemedText style={styles.orderText}>Date: {date}</ThemedText>
+            </View>
+        );
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             {/* Header personnalisé */}
@@ -145,6 +189,7 @@ export default function ProfileScreen() {
                     </View>
                 )}
 
+                {/* Section Favoris */}
                 <ThemedText style={styles.sectionTitle}>Produits favoris</ThemedText>
                 <FlatList
                     data={favoriteProducts}
@@ -155,7 +200,20 @@ export default function ProfileScreen() {
                     renderItem={renderFavoriteItem}
                 />
 
-                {/* Bouton pour se déconnecter */}
+                {/* Section Commandes */}
+                <ThemedText style={styles.sectionTitle}>Historique des commandes</ThemedText>
+                {orders.length > 0 ? (
+                    <FlatList
+                        data={orders}
+                        keyExtractor={(item) => item.id}
+                        contentContainerStyle={styles.ordersList}
+                        renderItem={renderOrderItem}
+                    />
+                ) : (
+                    <ThemedText style={styles.noOrderText}>Aucune commande passée</ThemedText>
+                )}
+
+                {/* Bouton de déconnexion */}
                 <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
                     <ThemedText style={styles.logoutButtonText}>Se déconnecter</ThemedText>
                 </TouchableOpacity>
@@ -216,20 +274,19 @@ const styles = StyleSheet.create({
     favoritesList: {
         paddingVertical: 10,
     },
-    // Styles de la carte produit pour les favoris
+    // Styles pour les cartes des produits favoris
     favoriteItem: {
-        flex: 1,
         backgroundColor: '#1F1B24',
-        margin: 5,
         borderRadius: 10,
-        height: 212,
         padding: 10,
+        marginRight: 10,
+        alignItems: 'center',
+        width: 150,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.3,
-        shadowRadius: 4,
-        elevation: 3,
-        alignItems: 'center',
+        shadowRadius: 3,
+        elevation: 5,
     },
     favoriteImage: {
         width: 130,
@@ -255,6 +312,33 @@ const styles = StyleSheet.create({
     favoritePrice: {
         fontSize: 14,
         color: '#BB86FC',
+    },
+    // Styles pour la section commandes
+    ordersList: {
+        paddingBottom: 10,
+    },
+    orderItem: {
+        backgroundColor: '#1F1B24',
+        borderRadius: 10,
+        padding: 15,
+        marginBottom: 10,
+        width: '100%',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 3,
+        elevation: 5,
+    },
+    orderText: {
+        fontSize: 14,
+        color: '#E1E1E1',
+        marginBottom: 3,
+    },
+    noOrderText: {
+        fontSize: 16,
+        color: '#bbb',
+        fontStyle: 'italic',
+        marginBottom: 20,
     },
     logoutButton: {
         backgroundColor: '#03dac6',
