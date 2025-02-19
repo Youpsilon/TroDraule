@@ -20,6 +20,7 @@ export default function ProductDetails({ route }) {
     const navigation = useNavigation();
     const { user } = useAuth();
     const [isFavorite, setIsFavorite] = useState(false);
+    const [cartAdded, setCartAdded] = useState(false);
 
     if (!route.params || !route.params.product) {
         return (
@@ -78,8 +79,23 @@ export default function ProductDetails({ route }) {
         }
     };
 
-    const handleAddToCart = () => {
-        console.log(`Produit ${product.name} ajouté au panier.`);
+    // Fonction pour ajouter le produit au panier dans Firebase
+    const handleAddToCart = async () => {
+        if (!user) {
+            console.log("Utilisateur non connecté.");
+            return;
+        }
+        const userRef = doc(firestore, 'users', user.uid);
+        try {
+            await updateDoc(userRef, {
+                cart: arrayUnion(product.id),
+            });
+            console.log(`Produit ${product.name} ajouté au panier.`);
+            setCartAdded(true);
+            setTimeout(() => setCartAdded(false), 2000);
+        } catch (error) {
+            console.error("Erreur lors de l'ajout au panier :", error);
+        }
     };
 
     const handleCartPress = () => {
@@ -111,31 +127,30 @@ export default function ProductDetails({ route }) {
                     </View>
                 </View>
 
-                {/* Carte de détails du produit */}
-                <View style={styles.card}>
-                    {/* Zone de l'image avec icône de favori intégrée dans la carte */}
-                    <View style={styles.imageContainer}>
-                        {product.imageUrl ? (
-                            <Image
-                                style={styles.image}
-                                source={{ uri: product.imageUrl }}
-                                resizeMode="contain"
-                            />
-                        ) : (
-                            <View style={[styles.image, styles.noImage]}>
-                                <ThemedText style={styles.noImageText}>Pas d'image</ThemedText>
-                            </View>
-                        )}
-                        <TouchableOpacity style={styles.favoriteIcon} onPress={handleToggleFavorite}>
-                            <Ionicons
-                                name={isFavorite ? 'heart' : 'heart-outline'}
-                                size={35}
-                                color={isFavorite ? 'red' : 'white'}
-                            />
-                        </TouchableOpacity>
-                    </View>
+                {/* Zone de l'image avec icône de favori intégrée dans la carte */}
+                <View style={styles.imageContainer}>
+                    {product.imageUrl ? (
+                        <Image
+                            style={styles.image}
+                            source={{ uri: product.imageUrl }}
+                            resizeMode="contain"
+                        />
+                    ) : (
+                        <View style={[styles.image, styles.noImage]}>
+                            <ThemedText style={styles.noImageText}>Pas d'image</ThemedText>
+                        </View>
+                    )}
+                    <TouchableOpacity style={styles.favoriteIcon} onPress={handleToggleFavorite}>
+                        <Ionicons
+                            name={isFavorite ? 'heart' : 'heart-outline'}
+                            size={35}
+                            color={isFavorite ? 'red' : 'white'}
+                        />
+                    </TouchableOpacity>
+                </View>
 
-                    {/* Détails textuels */}
+                {/* Détails textuels */}
+                <View style={styles.card}>
                     <ThemedText style={styles.name}>{product.name}</ThemedText>
                     {product.price !== undefined && (
                         <ThemedText style={styles.price}>{product.price} €</ThemedText>
@@ -151,6 +166,13 @@ export default function ProductDetails({ route }) {
                     <TouchableOpacity style={styles.cartButton} onPress={handleAddToCart}>
                         <ThemedText style={styles.cartButtonText}>Ajouter au panier</ThemedText>
                     </TouchableOpacity>
+                    {cartAdded && (
+                        <View style={styles.confirmationContainer}>
+                            <ThemedText style={styles.confirmationText}>
+                                Produit ajouté au panier !
+                            </ThemedText>
+                        </View>
+                    )}
                 </View>
             </ScrollView>
         </SafeAreaView>
@@ -184,17 +206,6 @@ const styles = StyleSheet.create({
     rightIcons: {
         flexDirection: 'row',
     },
-    card: {
-        backgroundColor: '#1F1B24',
-        borderRadius: 10,
-        padding: 20,
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
-        elevation: 3,
-    },
     imageContainer: {
         position: 'relative',
         width: '100%',
@@ -222,6 +233,17 @@ const styles = StyleSheet.create({
         padding: 4,
         backgroundColor: 'rgba(0,0,0,0.4)',
         borderRadius: 20,
+    },
+    card: {
+        backgroundColor: '#1F1B24',
+        borderRadius: 10,
+        padding: 20,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 3,
     },
     name: {
         fontSize: 24,
@@ -255,5 +277,17 @@ const styles = StyleSheet.create({
         color: '#121212',
         fontWeight: 'bold',
         fontSize: 16,
+    },
+    confirmationContainer: {
+        marginTop: 15,
+        backgroundColor: '#03dac6',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 20,
+    },
+    confirmationText: {
+        color: '#121212',
+        fontWeight: 'bold',
+        fontSize: 14,
     },
 });
