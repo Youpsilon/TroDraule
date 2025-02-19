@@ -11,8 +11,10 @@ import {
 } from 'react-native';
 import Constants from 'expo-constants';
 import { ThemedText } from '../components/ThemedText';
-import { firestore } from '../firebaseConfig';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, doc, getDoc } from 'firebase/firestore';
+import { firestore } from '../../firebaseConfig';
+import { useAuth } from "../contexts/AuthContext";
+import LoginScreen from "../screens/LoginScreen";
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -21,6 +23,8 @@ export default function HomeScreen() {
     const [products, setProducts] = useState([]);
     const [searchText, setSearchText] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
+    const [prenom, setPrenom] = useState('');
+    const { user, loading } = useAuth();
 
     // Fonction de mélange (shuffle) utilisant l'algorithme Fisher-Yates
     const shuffleArray = (array) => {
@@ -49,8 +53,36 @@ export default function HomeScreen() {
             }
         );
         return () => unsubscribe();
-    }, []);
+    }, []); // Exécution une seule fois au montage
 
+    // Charger le prénom de l'utilisateur
+    useEffect(() => {
+        if (user) {
+            const userRef = doc(firestore, 'users', user.uid);
+            const unsubscribe = onSnapshot(userRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    console.log("Données Firestore récupérées:", data);  // Vérifier les données récupérées
+                    const prenomFromFirestore = data?.prenom;
+                    setPrenom(prenomFromFirestore || '');
+                } else {
+                    console.log("Aucune donnée trouvée pour cet utilisateur.");
+                }
+            }, (error) => {
+                console.error("Erreur lors de la récupération du prénom:", error);
+            });
+
+            return () => unsubscribe();
+        }
+    }, [user]);
+
+
+
+    // Si l'utilisateur n'est pas connecté, rediriger vers l'écran de connexion
+    if (loading) return <ThemedText style={styles.productPrice}>Chargement...</ThemedText>;
+    if (!user) return <LoginScreen />;
+
+    // Filtrer les produits selon la catégorie sélectionnée et la recherche
     const filteredProducts = products.filter((product) => {
         const matchCategory = selectedCategory === 'all' || product.category === selectedCategory;
         const matchSearch = product.name?.toLowerCase().includes(searchText.toLowerCase());
@@ -139,7 +171,7 @@ export default function HomeScreen() {
                     ))}
                 </View>
 
-                {/* Grille des produits filtrés */}
+                {/* Grille des produits filtrés avec padding en bas */}
                 <FlatList
                     data={filteredProducts}
                     keyExtractor={(item) => item.id}

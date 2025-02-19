@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import Constants from 'expo-constants';
 import { ThemedText } from '../components/ThemedText';
-import { firestore } from '../firebaseConfig';
+import { firestore } from '../../firebaseConfig';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';

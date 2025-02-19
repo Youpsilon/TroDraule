@@ -7,6 +7,8 @@ import { Easing } from 'react-native';
 import HomeScreen from '../screens/HomeScreen';
 import ProductDetails from '../screens/ProductDetails';
 import ProfileScreen from '../screens/ProfileScreen';
+import LoginScreen from "../screens/LoginScreen";
+import SignUpScreen from "../screens/SignUpScreen";
 import CartScreen from '../screens/CartScreen';
 
 const Stack = createStackNavigator();
@@ -42,6 +44,8 @@ export default function AppNavigator() {
                 <Stack.Screen name="ProductDetails" component={ProductDetails} />
                 <Stack.Screen name="Profile" component={ProfileScreen} />
                 <Stack.Screen name="Cart" component={CartScreen} />
+                <Stack.Screen name="Login" component={LoginScreen}/>
+                <Stack.Screen name="SignUp" component={SignUpScreen}/>
             </Stack.Navigator>
         </NavigationContainer>
     );
