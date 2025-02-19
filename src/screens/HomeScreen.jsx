@@ -11,9 +11,11 @@ import {
 } from 'react-native';
 import { ThemedText } from '../components/ThemedText';
 import { HelloWave } from '../components/HelloWave';
-import { firestore } from '../firebaseConfig';
+import { firestore } from '../../firebaseConfig';
+import { useAuth } from "../contexts/AuthContext";
+import LoginScreen from "../screens/LoginScreen";
 
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { useNavigation } from '@react-navigation/native';
 
 export default function HomeScreen() {
@@ -21,7 +23,10 @@ export default function HomeScreen() {
     const [products, setProducts] = useState([]);
     const [searchText, setSearchText] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
+    const [prenom, setPrenom] = useState('');
+    const { user, loading } = useAuth();
 
+    // Charger les produits lorsque le composant est monté
     useEffect(() => {
         const colRef = collection(firestore, 'products');
         const unsubscribe = onSnapshot(
@@ -38,23 +43,54 @@ export default function HomeScreen() {
             }
         );
         return () => unsubscribe();
-    }, []);
+    }, []); // Exécution une seule fois au montage
 
+    // Charger le prénom de l'utilisateur
+    useEffect(() => {
+        if (user) {
+            const userRef = doc(firestore, 'users', user.uid);
+            const unsubscribe = onSnapshot(userRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    console.log("Données Firestore récupérées:", data);  // Vérifier les données récupérées
+                    const prenomFromFirestore = data?.prenom;
+                    setPrenom(prenomFromFirestore || '');
+                } else {
+                    console.log("Aucune donnée trouvée pour cet utilisateur.");
+                }
+            }, (error) => {
+                console.error("Erreur lors de la récupération du prénom:", error);
+            });
+
+            return () => unsubscribe();
+        }
+    }, [user]);
+
+
+
+    // Si l'utilisateur n'est pas connecté, rediriger vers l'écran de connexion
+    if (loading) return <ThemedText style={styles.productPrice}>Chargement...</ThemedText>;
+    if (!user) return <LoginScreen />;
+
+    // Filtrer les produits selon la catégorie sélectionnée et la recherche
     const filteredProducts = products.filter((product) => {
         const matchCategory = selectedCategory === 'all' || product.category === selectedCategory;
         const matchSearch = product.name?.toLowerCase().includes(searchText.toLowerCase());
         return matchCategory && matchSearch;
     });
 
+    // Naviguer vers l'écran de profil
     const handleProfilePress = () => {
         navigation.navigate('Profile');
     };
 
+    // Naviguer vers l'écran de détails du produit
     const handleProductPress = (product) => {
         console.log("Navigating to ProductDetails with:", product);
         navigation.navigate('ProductDetails', { product });
     };
 
+    // Rendu d'un produit individuel
     const renderProduct = ({ item }) => (
         <TouchableOpacity
             onPress={() => handleProductPress(item)}
@@ -89,7 +125,7 @@ export default function HomeScreen() {
                 {/* En-tête avec Welcome et bouton Profil */}
                 <View style={styles.header}>
                     <ThemedText type="title" style={styles.title}>
-                        Welcome!
+                        {prenom ? `Hello ${prenom}!` : 'Welcome!'} {/* Affichage dynamique du prénom */}
                     </ThemedText>
                     <TouchableOpacity onPress={handleProfilePress} style={styles.profileButton}>
                         <ThemedText style={styles.profileButtonText}>Profil</ThemedText>
@@ -114,16 +150,10 @@ export default function HomeScreen() {
                         <TouchableOpacity
                             key={index}
                             onPress={() => setSelectedCategory(cat)}
-                            style={[
-                                styles.filterButton,
-                                selectedCategory === cat && styles.filterButtonActive,
-                            ]}
+                            style={[styles.filterButton, selectedCategory === cat && styles.filterButtonActive]}
                         >
                             <ThemedText
-                                style={[
-                                    styles.filterButtonText,
-                                    selectedCategory === cat && styles.filterButtonTextActive,
-                                ]}
+                                style={[styles.filterButtonText, selectedCategory === cat && styles.filterButtonTextActive]}
                             >
                                 {cat === 'all' ? 'Tous' : cat}
                             </ThemedText>
